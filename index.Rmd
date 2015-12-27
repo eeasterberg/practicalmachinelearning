@@ -1,0 +1,71 @@
+### Title: Predicting the Quality of Movement in Weight Lifting Exercises
+
+### Synopsis
+
+The purpose of this analysis is to create a prediction model that will, given movement data from on-body sensors, determine whether a weight lifting exercise is being performed correctly. The original study took data from accelerometers on the belt, forearm, arm, and dumbbell of the participants, who were asked to do lifts correctly (outcome A) and incorrectly (in different ways, outcomes B - E). More information can be found at the project website: [http://groupware.les.inf.puc-rio.br/har](http://groupware.les.inf.puc-rio.br/har)
+
+The resultant model, using random forest classification, has an error estimate of 0.61%. On a set of twenty test cases withheld from the data, the model correctly identifed 20 out of 20.
+
+### Data Processing
+
+We begin by loading needed libraries, then reading the data from the CSV file (due to technical issues, we read from a local copy). There are a number of missing and division by 0 values, so we convert them all into NAs while reading the data.
+```{r}
+suppressWarnings(suppressMessages(library(caret)))
+suppressWarnings(suppressMessages(library(randomForest)))
+```
+```{r, cache = TRUE}
+training <- read.csv("C:/Users/corner PC/Desktop/Coursera/pml-training.csv", header = TRUE,  na.strings=c("NA","NaN", " ", "", "#DIV/0!"))
+```
+
+We have 19,622 observations of 160 variables, but we eliminate the variables with NA values (the other option would have been to interpolate values for the NAs, but, as we shall see, we will have enough variables left to build a good model.)
+
+```{r}
+training2 <- training[, colSums(is.na(training)) == 0]
+```
+
+We are left with 60 variables; upon inspection, we find that the first seven columns are control, name, or timestamp variables, so we eliminate those.
+
+```{r}
+names(training2)[1:7]
+training3 <- training2[8:60]
+```
+
+We are left with a clean dataset with 19,622 observations of 53 variables, and we can build our prediction model.
+
+### Building the Model
+
+Our strategy is to partition the training data set into a training subset and a testing subset, allowing for cross-validation. We will then fit a random forest model on our training subset, which is generally a very reliable technique, and then validate the model using our testing subset.
+
+We take our cleaned data set and partition, putting 75% of the values into training, the rest into testing. (The partition is on the result variable, classe.)
+
+```{r}
+set.seed(1247)
+inTrain <- createDataPartition(y = training3$classe, p = 0.75, list = FALSE)
+training <- training3[inTrain,]
+testing <- training3[-inTrain,]
+```
+
+Our training partition has 14,718 observations, our testing partition 4,904. We now fit a random forest model. 
+
+[One technical note: we found when we allowed the ntree parameter, which specifies the number of trees to grow, to run at its default value of 500, memory became an issue on the computer that was being used. Some experimentation showed that the function could run successfully with ntree set to 100, and the results seem to be successful.]
+
+```{r}
+modelFit <- randomForest(training$classe ~ ., ntree = 100, data = training)
+modelFit
+```
+
+As we can see, the error estimate is 0.61%, which is quite good, and the confusion matrix shows, as we would hope, the bulk of the values on the diagonal.
+
+What remains is to verify that the model does a good job of predicting using our testing set. To do that, we run the predict() function using the model on the testing data set, and print out a table comparing the results.
+
+```{r}
+pred <- predict(modelFit, testing)
+table(pred, testing$classe)
+```
+
+### Conclusion
+
+Unfortunately, some of the other models that could have been tried were not available due to limitations of the hardware used. Nonetheless, the error estimate and the confusion matrix look quite good, so we are confident that this model does a good job of predicting the quality of movement.
+
+We gained an even stronger measure of confidence from running the model on a separate 20-item data set which was withheld from the original data. Here, all 20 observations were predicted correctly.
+
